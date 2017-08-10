@@ -15,8 +15,12 @@ using namespace std;
 
 
 string rpNames[6] = {"near top", "near bottom", "near horizontal", "far horizontal", "far top", "far bottom"};
+const bool showVertical = false;
+const int divX = showVertical ? 3 : 2;
+const int divY = showVertical ? 2 : 1;
+const int RPCount = divX*divY;
 
-TFile file("test20000_beam1.root");
+TFile file("test20000_beam2.root");
 TTreeReader reader("Events", &file);
 TTreeReaderArray<PSimHit> ps(reader, "PSimHits_g4SimHits_TotemHitsRP_TestFlatGun.obj");
 
@@ -34,7 +38,9 @@ while (reader.Next()) {
 		int rpId = (ps[i].detUnitId()>> 19) & 0x7;
 		int plId = (ps[i].detUnitId()>> 15) & 0xF;
 
-		if(arId==0x0) continue;
+		if(!showVertical && rpId!=2 && rpId!=3) continue;
+
+		if(arId!=0 || stId!=0 || plId!=0) continue;
 
 		double xVal = ps[i].entryPoint().x();
 		double yVal = ps[i].entryPoint().y();
@@ -42,11 +48,13 @@ while (reader.Next()) {
   	}
 }
 
-TCanvas *cc = new TCanvas("RPs","RPs",1500,1000); 
-cc->Divide(3, 2);
+TCanvas *cc = new TCanvas("RPs", "RPs", 1800, 1800*divY/divX); 
+cc->Divide(divX, divY);
 
+int j=1;
 for(int i=0; i<6; ++i) {
-	cc->cd(i+1);
+	if(!showVertical && i!=2 && i!=3) continue;
+	cc->cd(j++);
 	h[i]->Draw("COLZ");
 }
 
