@@ -16,33 +16,42 @@ using namespace std;
 // > .x [path to the script]
 
 
-// the reco plots in absolute coordinates need to be transformed to the coordinates of the detector plane
+// the reco plots in absolute coordinates can be transformed to the coordinates of the detector plane
 // translation (xt, yt) + rotation by 'a' degrees
 //
 // [ cos a	sin a	0	] [ 1	0	xt	] [ x ] [ x2 ]
 // [ sin a	-cos a	0	]*[ 0	1	yt	]*[ y ]=[ y2 ]
 // [ 0		0	1	] [ 0	0	1	] [ 1 ] [ 1  ]
 //
-const int transform = true; 
+
+// PARAMS
+const bool transform = true; 
+const bool plotAll = false;
+TFile file("test_reco200000.root");
+// END PARAMS
+
+// CONST
 const double xt[6] = { 0.0, 0.0, -20.0, -20.0, 0.0, 0.0 };
 const double yt[6] = { -18.0, 18.0, 0.0, 0.0, -18.0, 18.0 };
 const double degree[6] = { 135.0, -45.0, 45.0, 45.0, 135.0, -45.0 };
 
-
 string rpNames[6] = {"near top", "near bottom", "near horizontal", "far horizontal", "far top", "far bottom"};
-const bool showVertical = true;
-const int divX = showVertical ? 3 : 2;
-const int divY = showVertical ? 2 : 1;
+string rpGroupNames[2] = {"near", "far"};
+const int divX = plotAll ? 3 : 2;
+const int divY = plotAll ? 2 : 1;
 const int RPCount = divX*divY;
+const int plotRange = 70;
+// END CONST
 
-TFile file("test_reco200000.root");
 TTreeReader reader("Events", &file);
 TTreeReaderArray<edm::DetSet<TotemRPLocalTrack>> ps(reader, "TotemRPLocalTrackedmDetSetVector_totemRPLocalTrackFitter__TestFlatGun.obj._sets");
 
-TH2D** h = new TH2D*[6]; 
+TH2D** h = new TH2D*[RPCount]; 
 
-for(int i=0; i<6; ++i) {
-	h[i] = new TH2D(rpNames[i].c_str(), rpNames[i].c_str(), 100, -20, 20, 100, -20, 20);
+for(int i=0; i<RPCount; ++i) {
+	if(!transform && !plotAll) h[i] = new TH2D(rpGroupNames[i].c_str(), rpGroupNames[i].c_str(), 100, -plotRange, plotRange, 100, -plotRange, plotRange);
+	else if(transform && !plotAll) h[i] = new TH2D(rpNames[i+2].c_str(), rpNames[i+2].c_str(), 100, -plotRange, plotRange, 100, -plotRange, plotRange);
+	else h[i] = new TH2D(rpNames[i].c_str(), rpNames[i].c_str(), 100, -plotRange, plotRange, 100, -plotRange, plotRange);
 }
 
 while (reader.Next()) {
@@ -53,7 +62,8 @@ while (reader.Next()) {
 		int rpId = (ps[i].detId()>> 19) & 0x7;
 		int plId = (ps[i].detId()>> 15) & 0xF;		//always 0 in reco
 
-		if(arId!=0 || stId!=0) continue;
+		if(arId!=1 || stId!=0) continue;
+		if(transform && !plotAll && rpId!=2 && rpId!=3) continue;
 
 		for (auto &psEl : ps[i]) {  
 			double xVal = psEl.getX0();
@@ -63,7 +73,8 @@ while (reader.Next()) {
 			double xVal2 = transform ? ((xVal+xt[rpId])*cos(d) + (yVal+yt[rpId])*sin(d)) : xVal;
 			double yVal2 = transform ? ((xVal+xt[rpId])*sin(d) - (yVal+yt[rpId])*cos(d)) : yVal;
 
-			h[rpId]->Fill(xVal2, yVal2);
+			int hId = plotAll ? rpId : (transform ? rpId-2 : rpId/3);
+			h[hId]->Fill(xVal2, yVal2);
 		}
 
   	}
@@ -73,9 +84,8 @@ TCanvas *cc = new TCanvas("RPs", "RPs", 1800, 1800*divY/divX);
 cc->Divide(divX, divY);
 
 int j=1;
-for(int i=0; i<6; ++i) {
-	if(!showVertical && i!=2 && i!=3) continue;
-	cc->cd(j++);
+for(int i=0; i<RPCount; ++i) {
+	cc->cd(i+1);
 	h[i]->SetStats(false);
 	h[i]->Draw("COLZ");
 }
